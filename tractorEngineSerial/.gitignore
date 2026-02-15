@@ -1,0 +1,20 @@
+# Arduino build artifacts
+*.elf
+*.hex
+*.bin
+*.map
+
+# Arduino IDE
+*.tmp
+*.log
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# VS Code / IDEs (optional)
+.vscode/
+.idea/
+
+# Backup files
+*~
