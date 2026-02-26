@@ -2,7 +2,7 @@
 
 Part::Part(uint8_t pin, Outputs::OUTS partLED, Outputs& outputs)
   : partLED_(partLED),
-    debounce_(pin, 100, true),
+    debounce_(pin, PartDebounceMillis, true),
     outputs_(outputs)
 {
   // Part::goOff();
@@ -14,6 +14,7 @@ void Part::begin() {
 
 void Part::goOff() {
   outputs_.setBitOff(partLED_);
+  partState_ = Part::PartState::Initial;
 }
 
 void Part::goOn() {
@@ -32,12 +33,12 @@ Part::PartState Part::service() {
       partState_ = Part::PartState::PartRemoved;
       // turn on so we can flash it
       outputs_.setBitFlash(partLED_);
-      break;
+      return Part::PartState::PartJustRemoved;
       // part put back on the tractor
     case Debounce::Event::Active:
       partState_ = Part::PartState::PartInstalled;
       outputs_.setBitOn(partLED_);
-      break;
+      return Part::PartState::PartJustRemoved;
   }
   return partState_;
 }

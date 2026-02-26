@@ -1,5 +1,5 @@
 #include <arduino.h>
-// #include "Blink.h"
+#include "WDT.h"
 #include "Outputs.h"
 #include "Pins.h"
 #include "Debounce.h"
@@ -8,68 +8,62 @@
 #include <WDT.h>
 // #include <Adafruit_AW9523.h>
 #include "Audio.h"
+// go button debounce time
 #define DebounceMillis 100
-#define BlinkMillis 400
-// prompt the user with which part should be serviced
-#define PromptMillis 15000
-// turn off everything after this many prompts without a start
-#define PromptCount 5
-
-unsigned long promptTime = 0;
-unsigned int promptCounter = 0;
+// inactivity timer
+#define InactiveMillis 60000
+// engine starting audio time. Turn tractor off after playing
+#define StartingMillis 10000
+unsigned long activityTimer = 0;
 Audio audio;
-// Blink blink(BlinkMillis);
 Outputs myOutputs;
 // go button
 Debounce goDebounce(StartButtonPin, DebounceMillis, true);
+// parts
 Part oilFilter(OilFilterPin, Outputs::OUTS::OilFilterLEDSR, myOutputs);
 Part airFilter(AirFilterPin, Outputs::OUTS::AirFilterLEDSR, myOutputs);
 Part dipStick(DipstickPin, Outputs::OUTS::DipstickLEDSR, myOutputs);
+// tractor state
 bool tractorOff = true;
-// bool inDiagMode = false;
 
 void setup() {
   Serial.begin(115200);
   unsigned long start = millis();
-  const  unsigned long timeout = 2000;
-
+  const unsigned long timeout = 2000;
   while (!Serial && (millis() - start < timeout))
     ;
-  // SPI.begin();
+  WDT.begin(5000);
+  WDT.refresh();
   audio.begin();
   myOutputs.begin();
   goDebounce.begin();
-  oilFilter.begin();
-  // Serial.print(__LINE__); Serial.print(" ");Serial.println(myOutputs.sr_);
-  airFilter.begin();
-  //  Serial.print(__LINE__); Serial.print(" ");Serial.println(myOutputs.sr_);
-  dipStick.begin();
-  //  Serial.print(__LINE__); Serial.print(" ");Serial.println(myOutputs.sr_);
-  myOutputs.setBitOff(Outputs::OUTS::StartButtonLEDSR);
-  audio.play(Audio::Tracks::THANKYOU);
+  turnTractorOff();
   Serial.println("running");
 }
 
-void tractorOn() {
+void turnTractorOn() {
   tractorOff = false;
-  promptTime = millis();
-  promptCounter = 0;
+  activityTimer = millis();
   // turn on the start button LED
   myOutputs.setBitOn(Outputs::OUTS::StartButtonLEDSR);
   oilFilter.goOn();
   airFilter.goOn();
   dipStick.goOn();
+  playAudio();
+  resetActivityTimer();
 }
 
 void turnTractorOff() {
-  oilFilter.goOff();
-  airFilter.goOff();
-  dipStick.goOff();
+  oilFilter.begin();
+  airFilter.begin();
+  dipStick.begin();
   // turn off the start button LED
   myOutputs.setBitOff(Outputs::OUTS::StartButtonLEDSR);
   tractorOff = true;
+  audio.play(Audio::Tracks::THANKYOU);
 }
 // return true when ready to start.
+// otherwise, play the
 // update the user on what needs to be done
 void playAudio() {
   // encourage installation of missing parts
@@ -87,15 +81,15 @@ void playAudio() {
   }
 
   // parts that haven't been serviced yet
-  if (dipStick.getState() == Part::PartState::NoChange) {
+  if (dipStick.getState() == Part::PartState::Initial) {
     audio.play(Audio::Tracks::CheckOilLevel);
     return;
   }
-  if (oilFilter.getState() == Part::PartState::NoChange) {
+  if (oilFilter.getState() == Part::PartState::Initial) {
     audio.play(Audio::Tracks::CheckOilFilter);
     return;
   }
-  if (airFilter.getState() == Part::PartState::NoChange) {
+  if (airFilter.getState() == Part::PartState::Initial) {
     audio.play(Audio::Tracks::CheckAirFilter);
     return;
   }
@@ -115,65 +109,68 @@ bool statusCheck() {
 
 void serviceGoButton() {
   if (goDebounce.service() == Debounce::Event::Active) {
-    Serial.println(__LINE__);
+    resetActivityTimer();
     if (tractorOff) {
-      tractorOn();
-      Serial.println(__LINE__);
+      turnTractorOn();      
     }
+    // if the engine is ready to start
     if (statusCheck()) {
       audio.play(Audio::Tracks::EngineStarting);
-      setPromptShutdown();
+      setActivityTimer(StartingMillis);
     } else {
-      Serial.println(__LINE__);
+      // tell the user what needs to be done
       playAudio();
     }
   }
 }
 
-void serviceParts() {
-  oilFilter.service();
-  airFilter.service();
-  dipStick.service();
-}
-
-// service the blinking LEDs
-// void serviceBlink() {
-//   Blink::TimerState ts = blink.service();
-//   if (ts == Blink::TimerState::JustWentHigh || ts == Blink::TimerState::JustWentLow)
-//     myOutputs.service(ts);
-// }
-
-// use the prompt timer to shut down the tracter after it starts
-void setPromptShutdown() {
-  promptTime = millis() + PromptMillis;
-  promptCounter = PromptCount - 1;
-}
-
-// periodically prompt the user with the next part to check
-void servicePrompt() {
-  if (tractorOff)
-    return;
-  if (promptTime < millis()) {
-    promptTime = promptTime + PromptMillis;
-    promptCounter++;
-    if (promptCounter >= PromptCount) {
-      turnTractorOff();
-    }
+bool playedSomething(Part::PartState ps) {
+  if (ps == Part::PartState::PartJustRemoved
+      || ps == Part::PartState::PartJustInstalled) {
+    playAudio();
+    return true;
+  } else {
+    return false;
   }
 }
+
+void serviceParts() {
+  if (tractorOff) return;
+  if (playedSomething(oilFilter.service())) {
+    resetActivityTimer();
+    return;
+  }
+  if (playedSomething(airFilter.service())) {
+    resetActivityTimer();
+    return;
+  }
+  if (playedSomething(dipStick.service())) {
+    resetActivityTimer();
+    return;
+  }
+}
+
+// use the prompt timer to shut down the tracter after the engine starting audio (about 10 seconds)
+void resetActivityTimer() {
+  activityTimer = millis() + InactiveMillis;
+}
+
+void setActivityTimer(unsigned long t){
+  activityTimer = millis() + t;
+}
+
+
+void serviceActivityTimer() {
+  if (tractorOff)
+    return;
+  if (activityTimer < millis())
+    turnTractorOff();
+}
+
 void loop() {
   serviceGoButton();
   serviceParts();
-  servicePrompt();
+  serviceActivityTimer();
   myOutputs.service();
-}
-
-void loopx() {
-  if (promptTime < millis()) {
-    Serial.println(__LINE__);
-    promptTime = promptTime + PromptMillis;
-    myOutputs.setBitOn(Outputs::OUTS::StartButtonLEDSR);
-    delay(500);
-    myOutputs.setBitOff(Outputs::OUTS::StartButtonLEDSR);
-  }
+  WDT.refresh();
 }

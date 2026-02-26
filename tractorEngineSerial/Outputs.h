@@ -20,27 +20,18 @@ public:
     AirFilterLEDSR,
      OutsCount
   };
-  void service(Blink::TimerState ts);
-  // void AudioResetOff();
-  void setDataToZeros();
-  // void writeData();
   void setBitOn(OUTS out);
   void setBitOff(OUTS out);
   void setBitFlash(OUTS out);
+  // call this to make the outputs blink
   void service();
-  void allOn();
-  void allOff();
-  // void allBlink();
+private:
+  // display data. blinking action defined by blinkBits_
   uint8_t sr_;
   Blink blink_;
-private:
-  void transfer();
-  void transferFlash();
-  void transferFlashOn();
-  void transferFlashOff();
- // shift register contents
-  
-  // which outputs should blink
+  void transfer();  
+  void transferPhase1();
+  void transferPhase2();
+ // which outputs should blink
   uint8_t blinkBits_;
-  //bool blinkState_[static_cast<unsigned int>(Outputs::OUTS::OutsCount)];
 };

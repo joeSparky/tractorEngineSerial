@@ -1,7 +1,9 @@
 #pragma once
 #include "Outputs.h"
 #include "Debounce.h"
-// #include "Blink.h"
+// make part debounce time very long so that kids aren't
+// bugged by audio while struggling to install a part
+#define PartDebounceMillis 1000
 
 class Outputs;
 
@@ -10,9 +12,11 @@ public:
   Part(uint8_t pin, Outputs::OUTS partLed, Outputs& outputs);
 
   enum PartState {
-    NoChange,
+    Initial,
     PartRemoved,
-    PartInstalled
+    PartInstalled,
+    PartJustRemoved,
+    PartJustInstalled
   };
 
   PartState getState();

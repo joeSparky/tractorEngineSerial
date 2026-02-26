@@ -11,7 +11,6 @@ void Audio::play(Tracks track) {
   name[sizeof(name) - 1] = '\0';
 
   sfx_.playTrack(name);
-  Serial.print("playing:");Serial.println(name);
 }
 
 void Audio::begin() {

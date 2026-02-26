@@ -15,13 +15,10 @@ void Outputs::begin() {
   transfer();
 }
 
-void Outputs::setDataToZeros() {
-  sr_ = 0;
-  transfer();
-}
-
 void Outputs::setBitOn(OUTS out) {
-  sr_ |= (1 << static_cast<int>(out));
+  uint8_t mask = 1 << static_cast<int>(out);
+  sr_ |= mask;
+  blinkBits_ &= ~mask;
   transfer();
 }
 
@@ -31,35 +28,42 @@ void Outputs::transfer() {
   digitalWrite(SRSelectPin, HIGH);
 }
 
-void Outputs::transferFlashOn() {
+// first half of a cycle
+// if blinkBit_ is off, display the data.
+// if blinkBit_ is on, turn on the displayed bit
+void Outputs::transferPhase1() {
   SPI.transfer(sr_ | blinkBits_);
   digitalWrite(SRSelectPin, LOW);
   digitalWrite(SRSelectPin, HIGH);
 }
 
-void Outputs::transferFlashOff() {
+// second half of a cycle
+// if blinkBit_ is off, display the data
+// if blinkBit_ is on, turn off the display bit
+void Outputs::transferPhase2() {
   SPI.transfer(sr_ & (~blinkBits_));
   digitalWrite(SRSelectPin, LOW);
   digitalWrite(SRSelectPin, HIGH);
 }
 
 void Outputs::setBitOff(OUTS out) {
-  sr_ &= ~(1 << static_cast<int>(out));
-  blinkBits_ &= ~(1 << static_cast<int>(out));
+  uint8_t mask = 1 << static_cast<int>(out);
+  sr_ &= ~mask;
+  blinkBits_ &= ~mask;
   transfer();
 }
 
 void Outputs::setBitFlash(OUTS out) {
-  blinkBits_ |= (1 << static_cast<int>(out));
-  sr_ |= (1 << static_cast<int>(out));
+  uint8_t mask = 1 << static_cast<int>(out);  
+  blinkBits_ |= mask;
 }
 
 void Outputs::service() {
   Blink::TimerState ts = blink_.service();
   if (ts == Blink::TimerState::JustWentHigh) {
-    transferFlashOn();
+    transferPhase1();
   }
   if (ts == Blink::TimerState::JustWentLow) {
-    transferFlashOff();
+    transferPhase2();
   }
 }
