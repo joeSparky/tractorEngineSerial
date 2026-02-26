@@ -1,16 +1,16 @@
 #pragma once
 // #pragma message ">>> USING Outputs.h from tractor02 sketch folder <<<"
 #include <Arduino.h>
-#include <Adafruit_AW9523.h>
-#include <Wire.h>
-// #include <SPI.h>
+// #include <bitset>
+#include <SPI.h>
 // #include <SpiShiftRegisterChain.h>
 #include "Pins.h"
-// #include "Blink.h"
+#include "Blink.h"
+#define BlinkMillis 800
 // constexpr uint8_t SRLatchPin = 10;
 class Outputs {
 public:
-  // Outputs();
+  Outputs();
   void begin();
   // void resetAudio();
   enum class OUTS {
@@ -20,21 +20,27 @@ public:
     AirFilterLEDSR,
      OutsCount
   };
-  // void AudioResetOn();
+  void service(Blink::TimerState ts);
   // void AudioResetOff();
   void setDataToZeros();
   // void writeData();
   void setBitOn(OUTS out);
   void setBitOff(OUTS out);
-  // void onThenOff(OUTS out);
-  // void setBlink(OUTS out);
-  // void clearBlink(OUTS out);
+  void setBitFlash(OUTS out);
   void service();
   void allOn();
   void allOff();
   // void allBlink();
+  uint8_t sr_;
+  Blink blink_;
 private:
-  Adafruit_AW9523 aw_;
-  // Blink blink_;
+  void transfer();
+  void transferFlash();
+  void transferFlashOn();
+  void transferFlashOff();
+ // shift register contents
+  
+  // which outputs should blink
+  uint8_t blinkBits_;
   //bool blinkState_[static_cast<unsigned int>(Outputs::OUTS::OutsCount)];
 };

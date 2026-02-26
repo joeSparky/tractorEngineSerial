@@ -1,31 +1,22 @@
 #pragma once
 #include "Outputs.h"
 #include "Debounce.h"
-#include "Blink.h"
+// #include "Blink.h"
 
 class Outputs;
 
 class Part {
 public:
-  Part(uint8_t pin, Outputs::OUTS partLed, Outputs& outputs, Blink& blink);
+  Part(uint8_t pin, Outputs::OUTS partLed, Outputs& outputs);
 
   enum PartState {
-    // on reset, if the part is on the tractor, go to this state
-    // LED on
-    NeedsServicing,
-    // on reset, if the part is not on the tractor, go to this state
-    // LED flashing
-    Missing,
-    // if the part has been taken off and then put back on, go to this state
-    // LED off
-    Serviced,
-// the tractor has completed a cycle and is waiting for the child to press the start button.
-// LED stays off
-    Off
+    NoChange,
+    PartRemoved,
+    PartInstalled
   };
 
   PartState getState();
-  void service();
+  PartState service();
   void begin();
   void goOn();
   void goOff();
@@ -37,6 +28,6 @@ public:
   Debounce debounce_;
   // bool firstTime_;
 private:
-  Outputs outputs_;
-  Blink blink_;
+  Outputs& outputs_;
+  // Blink blink_;
 };

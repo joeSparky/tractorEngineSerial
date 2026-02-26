@@ -1,67 +1,65 @@
 #include "Outputs.h"
-// Outputs::Outputs()
-//   : aw_(SRLatchPin, 2){};
+Outputs::Outputs()
+  : blink_(BlinkMillis) {
+  sr_ = 0;
+  blinkBits_ = 0;
+};
 
 void Outputs::begin() {
-  Outputs::setDataToZeros();
+  SPI.begin();
+  SPI.beginTransaction(SPISettings());
+  pinMode(SRSelectPin, OUTPUT);
+  digitalWrite(SRSelectPin, HIGH);
+  sr_ = 0;
+  blinkBits_ = 0;
+  transfer();
 }
+
 void Outputs::setDataToZeros() {
-  for (int i=0; i<static_cast<int>(Outputs::OUTS::OutsCount); i++)
-    aw_.digitalWrite(i, LOW);
+  sr_ = 0;
+  transfer();
 }
-
-// void Outputs::resetAudio() {
-//   digitalWrite(AudioResetPin, LOW);
-//   pinMode(AudioResetPin, OUTPUT);
-//   delay(100);
-//   digitalWrite(AudioResetPin, HIGH);
-//   pinMode(AudioActivePin, INPUT);
-// }
-
-// void Outputs::writeData() {
-//   aw_.writeData();
-// }
 
 void Outputs::setBitOn(OUTS out) {
-  aw_.digitalWrite(static_cast<int>(out), HIGH);
-  // Serial.print(__LINE__);Serial.print(":");Serial.println(static_cast<uint8_t>(out));
+  sr_ |= (1 << static_cast<int>(out));
+  transfer();
+}
+
+void Outputs::transfer() {
+  SPI.transfer(sr_);
+  digitalWrite(SRSelectPin, LOW);
+  digitalWrite(SRSelectPin, HIGH);
+}
+
+void Outputs::transferFlashOn() {
+  SPI.transfer(sr_ | blinkBits_);
+  digitalWrite(SRSelectPin, LOW);
+  digitalWrite(SRSelectPin, HIGH);
+}
+
+void Outputs::transferFlashOff() {
+  SPI.transfer(sr_ & (~blinkBits_));
+  digitalWrite(SRSelectPin, LOW);
+  digitalWrite(SRSelectPin, HIGH);
 }
 
 void Outputs::setBitOff(OUTS out) {
-  aw_.digitalWrite(static_cast<int>(out), LOW);
-  // Serial.println(__LINE__);
+  sr_ &= ~(1 << static_cast<int>(out));
+  blinkBits_ &= ~(1 << static_cast<int>(out));
+  transfer();
 }
 
-// void Outputs::onThenOff(OUTS out) {
-//   // ignore request if there's arlready something playing
-//   if (!digitalRead(AudioActivePin)) {
-//     return;
-//   }
-//   aw_.setBitOn(static_cast<int>(out));
-//   while (digitalRead(AudioActivePin)) {
-//     delay(100);
-//     // Serial.print(__LINE__);
-//     // Serial.print(":");
-//     // Serial.println(static_cast<int>(out));
-//   }
-//   aw_.setBitOff(static_cast<int>(out));
-// }
+void Outputs::setBitFlash(OUTS out) {
+  blinkBits_ |= (1 << static_cast<int>(out));
+  sr_ |= (1 << static_cast<int>(out));
+}
 
-void Outputs::allOn() {
-  for (unsigned int i = 0; i < static_cast<unsigned int>(Outputs::OUTS::OutsCount); i++) {
-    aw_.digitalWrite(i, HIGH);
+void Outputs::service() {
+  Blink::TimerState ts = blink_.service();
+  if (ts == Blink::TimerState::JustWentHigh) {
+    transferFlashOn();
   }
-  // Serial.println(__LINE__);
+  if (ts == Blink::TimerState::JustWentLow) {
+    transferFlashOff();
+  }
 }
-void Outputs::allOff() {
-  Outputs::setDataToZeros();
-  // aw_.writeData();
-  // Serial.println(__LINE__);
-}
-
-// void Outputs::AudioResetOn() {
-//   digitalWrite(AudioResetPin, LOW);
-// }
-// void Outputs::AudioResetOff() {
-//   digitalWrite(AudioResetPin, HIGH);
-// }

@@ -20,5 +20,5 @@ void Audio::begin() {
     ;
   if (!sfx_.reset())
     Serial.println("fx not found");
-  Audio::play(Tracks::THANKYOU);
+  // Audio::play(Tracks::THANKYOU);
 }
